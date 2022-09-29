@@ -1,94 +1,52 @@
-<h1 style="text-align: center;">arkworks::algebra</h1>
+# ZPrize MSM on Mobile Reference Test Harness
 
-<p style="text-align: center;">
-    <img src="https://github.com/arkworks-rs/algebra/workflows/CI/badge.svg?branch=master">
-    <a href="https://github.com/arkworks-rs/algebra/blob/master/LICENSE-APACHE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
-    <a href="https://github.com/arkworks-rs/algebra/blob/master/LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-    <a href="https://deps.rs/repo/github/arkworks-rs/algebra"><img src="https://deps.rs/repo/github/arkworks-rs/algebra/status.svg"></a>
-</p>
+Example and reference testing harness for the "[Accelerating MSM on Mobile](https://www.zprize.io/prizes/accelerating-mobile-proving)" challenge in ZPrize 2022. 
 
-The arkworks ecosystem consist of Rust libraries for designing and working with __zero knowledge succinct non-interactive arguments (zkSNARKs)__. This repository contains efficient implementations some of the key algebraic components underlying zkSNARKs: finite fields, elliptic curves, and polynomials.
+## Build
 
-This library is released under the MIT License and the Apache v2 License (see [License](#license)).
+### Android app
 
-**WARNING:** This is an academic proof-of-concept prototype, and in particular has not received careful code review. This implementation is NOT ready for production use.
+Building the Android app can be accomplished with Android Studio:
+1. Download [Android Studio](https://developer.android.com/studio) and install the Android API 32 platform, NDK, and Android SDK Platform tools through the SDK Manager.
+2. Open `zprize-mobile-harness/android/Zprize` in Android Studio.
+3. Use Android Studio's device manager to select either an emulator or physical device.
+4. Install the app on that device using the Run > Run 'app' menu action.
 
-## Directory structure
+### Rust library
 
-This repository contains several Rust crates:  
+Prebuilt libraries are available in this repository as `zprize-mobile-harness/android/ZPrize/app/src/main/jniLibs/armeabi-v7a`.
+When you modify the Rust libraries, build the modified library for inclusion in the Android app:
+1. Run `cargo build --target armv7-linux-androideabi --profile release`
+2. Copy `target/armv7-linux-androideabi/release/libcelo_zprize.so` to `android/ZPrize/app/src/main/jniLibs/armeabi-v7a/libmsm.so`.
+3. Rebuild and install the app as described above.
 
-* [`ark-ff`](ff): Provides generic implementations of various finite fields
-* [`ark-ec`](ec): Provides generic implementations for different kinds of elliptic curves, along with pairings over these
-* [`ark-poly`](poly): Implements univariate, multivariate, and multilinear polynomials, and FFTs over finite fields.
-* [`ark-serialize`](serialize): Provides efficient serialization and point compression for finite fields and elliptic curves
+Building for `aarch64` can also be achieved by with `cross build --target aarch64-linux-android
+--release` and placing the resulting library in `android/ZPrize/app/src/main/jniLibs/arm64-v8a/libmsm.so`
 
-In addition, the [`curves`](https://github.com/arkworks-rs/curves) repository contains implementations of popular elliptic curves; see [here](https://github.com/arkworks-rs/curves/README.md) for details.
+## Test vectors
 
-## Build guide
+A number of static test vectors to check the basic correctness of the MSM implementation are
+included, as described in the prize specification.
 
-The library compiles on the `stable` toolchain of the Rust compiler (v 1.51+). To install the latest version of Rust, first install `rustup` by following the instructions [here](https://rustup.rs/), or via your platform's package manager. Once `rustup` is installed, install the Rust toolchain by invoking:
+To modify the fixed test vectors, add the new test vector files to  `android/ZPrize/app/src/main/assets/points` and `android/ZPrize/app/src/main/assets/scalars`, then recompile the app. 
 
-```bash
-rustup install stable
-```
+To generate new test vector files, first generate the vectors, then run `serialize_input` once per vector with the same directory specified, with the `append` option set to `true`. This process is demonstrated in `src/main.rs` for one vector. 
 
-After that, use `cargo`, the standard Rust build tool, to build the libraries:
+## Benchmarking on host
 
-```bash
-git clone https://github.com/arkworks-rs/algebra.git
-cd algebra
-cargo build --release
-```
+You can run a benchmark locally (on your computer) with run `cargo run --release`. The local
+benchmark is defined in `src/main.rs`.
 
-## Tests
+## Benchmarking on device
 
-This library comes with comprehensive unit and integration tests for each of the provided crates. Run the tests with:
+On the Android device, output files were stored to `data/data/com.example.zprize/files/`.
+The output group elements of the MSM, one per iteration, are stored in `result.txt`.
+The time per iteration is recorded in `resulttimes.txt`.
+When running test vectors, the files will contain the results for each vector of inputs in sequence.
 
-```bash
-cargo test --all
-```
-
-## Benchmarks
-
-To run the benchmarks, install the nightly Rust toolchain, via `rustup install nightly`, and then run the following command:
+Pulling files from the device filesystem to your host can be accomplished with Android Studio or
+with ADB. Below is an example for getting the `resulttimes.txt` file.
 
 ```bash
-cargo +nightly bench
+adb -d shell 'run-as com.example.zprize cat /data/data/com.example.zprize/files/resulttimes.txt' > resulttimes.txt
 ```
-
-## Assembly backend for field arithmetic
-
-The `ark-ff` crate contains (off-by-default) optimized assembly implementations of field arithmetic that rely on the `adcxq`, `adoxq` and `mulxq` instructions. These are available on most `x86_64` platforms (Broadwell onwards for Intel and Ryzen onwards for AMD). Using this backend can lead to a 30-70% speedup in finite field and elliptic curve arithmetic. To build with this backend enabled, run the following command:
-
-```bash
-RUSTFLAGS="-C target-feature=+bmi2,+adx" cargo +nightly [test/build/bench] --features asm
-```
-
-To enable this in the `Cargo.toml` of your own projects, enable the `asm` feature flag:
-
-```toml
-ark-ff = { version = "0.3.0", features = [ "asm" ] }
-```
-
-Note that because inline assembly support in Rust is currently unstable, using this backend requires using the Nightly compiler at the moment.
-
-## License
-
-The crates in this repository are licensed under either of the following licenses, at your discretion.
-
-* Apache License Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or [apache.org license link](http://www.apache.org/licenses/LICENSE-2.0))
-* MIT license ([LICENSE-MIT](LICENSE-MIT) or [opensource.org license link](http://opensource.org/licenses/MIT))
-
-Unless you explicitly state otherwise, any contribution submitted for inclusion in this library by you shall be dual licensed as above (as defined in the Apache v2 License), without any additional terms or conditions.
-
-[zexe]: https://ia.cr/2018/962
-
-## Acknowledgements
-
-This work was supported by:
-a Google Faculty Award;
-the National Science Foundation;
-the UC Berkeley Center for Long-Term Cybersecurity;
-and donations from the Ethereum Foundation, the Interchain Foundation, and Qtum.
-
-An earlier version of this library was developed as part of the paper *"[ZEXE: Enabling Decentralized Private Computation][zexe]"*.
