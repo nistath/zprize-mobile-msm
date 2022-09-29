@@ -13,6 +13,8 @@ members = [
     "poly",
 
     "bls12_377",
+
+    "zprize-mobile-harness",
 ]
 
 [profile.release]
