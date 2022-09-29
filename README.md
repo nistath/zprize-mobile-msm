@@ -2,6 +2,13 @@
 
 Example and reference testing harness for the "[Accelerating MSM on Mobile](https://www.zprize.io/prizes/accelerating-mobile-proving)" challenge in ZPrize 2022. 
 
+## Changelog
+
+- Use latest arkworks
+- Make serialization format compatible with arkworks 0.3.0
+- Add CPU target flags
+- Enable LTO
+
 ## Build
 
 ### Android app
