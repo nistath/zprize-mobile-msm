@@ -34,6 +34,46 @@ type ScalarField = bls377::Fr;
 type Scalar = <ScalarField as PrimeField>::BigInt;
 type Instance = (Vec<Point>, Vec<Scalar>);
 
+fn bw_mask(size: u8) -> u64 {
+    debug_assert!(size < 64);
+    return (1u64 << size) - 1u64;
+}
+
+fn slice_bigint<const N: usize>(num: &[u64; N], num_bits: u8, start: u16) -> u64 {
+    const NUM_BITS_IN_WORD: u8 = 64;
+
+    debug_assert!(num_bits <= NUM_BITS_IN_WORD); // we only slice into 1 or 2 words
+    debug_assert!(N < u16::MAX as usize / NUM_BITS_IN_WORD as usize); // maximum word index `start` can reach
+    debug_assert!(N <= u8::MAX as usize); // must fit in u8 for later casts
+
+    let word_idx = (start / NUM_BITS_IN_WORD as u16) as u8;
+    let bit_idx = (start % NUM_BITS_IN_WORD as u16) as u8;
+
+    let a = num[word_idx as usize];
+
+    let a_max_width = NUM_BITS_IN_WORD - bit_idx;
+
+    let mut res: u64 = a >> bit_idx;
+    if num_bits < a_max_width {
+        res &= bw_mask(num_bits);
+    }
+
+    if (num_bits > a_max_width) && (word_idx < ((N - 1) as u8)) {
+        let b = num[(word_idx + 1) as usize];
+        let end_bit_idx = a_max_width;
+        let b_width = num_bits - end_bit_idx;
+
+        let payload = b & bw_mask(b_width);
+        res |= payload << end_bit_idx;
+
+        // NOTE: this is safe from overflow because the most significant `payload` bit
+        // is at most at position `b_width` and it is left shifted by `end_bit_idx`.
+        // Notice that the final positon of the most significant bit is
+        // `b_width + end_bit_idx = num_bits` which is asserted to be `num_bits <= NUM_BITS_IN_WORD`
+    }
+    res
+}
+
 fn ln_without_floats(a: usize) -> usize {
     // log2(a) * ln(2)
     (ark_std::log2(a) * 69 / 100) as usize
@@ -75,14 +115,7 @@ fn msm_bigint(bases: &[Point], bigints: &[Scalar]) -> ProjectivePoint {
                         res += base;
                     }
                 } else {
-                    let mut scalar_copy = scalar;
-
-                    // We right-shift by w_start, thus getting rid of the
-                    // lower bits.
-                    scalar_copy.divn(w_start as u32);
-
-                    // We mod the remaining bits by 2^{window size}, thus taking `c` bits.
-                    let bucket_idx = scalar_copy.as_ref()[0] % (1 << c);
+                    let bucket_idx = slice_bigint(&scalar.0, c as u8, w_start as u16);
 
                     // If the bucket_idx is non-zero, we update the corresponding
                     // bucket.
