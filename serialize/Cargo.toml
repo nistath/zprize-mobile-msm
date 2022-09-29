@@ -15,7 +15,7 @@ rust-version = "1.56"
 
 [dependencies]
 ark-serialize-derive = { version = "^0.3.0", path = "../serialize-derive", optional = true }
-ark-std = { version = "^0.3.0", default-features = false }
+ark-std = { version = "^0.3.0", path = "../std", default-features = false }
 digest = { version = "0.10", default-features = false }
 
 [dev-dependencies]
