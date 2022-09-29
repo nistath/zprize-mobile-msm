@@ -6,11 +6,11 @@ use ark_serialize::Flags;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SWFlags {
     /// Represents a point with positive y-coordinate by setting the MSB to 1.
-    YIsPositive = 0,
+    YIsPositive = 1 << 7,
     /// Represents the point at infinity by setting the setting the last-but-one bit to 1.
     PointAtInfinity = 1 << 6,
     /// Represents a point with negative y-coordinate by setting all bits to 0.
-    YIsNegative = 1 << 7,
+    YIsNegative = 0,
 }
 
 impl SWFlags {
@@ -59,7 +59,7 @@ impl Flags for SWFlags {
         let mut mask = 0;
         match self {
             SWFlags::PointAtInfinity => mask |= 1 << 6,
-            SWFlags::YIsNegative => mask |= 1 << 7,
+            SWFlags::YIsPositive => mask |= 1 << 7,
             _ => (),
         }
         mask
@@ -67,15 +67,15 @@ impl Flags for SWFlags {
 
     #[inline]
     fn from_u8(value: u8) -> Option<Self> {
-        let is_negative = (value >> 7) & 1 == 1;
+        let is_positive = (value >> 7) & 1 == 1;
         let is_infinity = (value >> 6) & 1 == 1;
-        match (is_negative, is_infinity) {
+        match (is_positive, is_infinity) {
             // This is invalid because we only want *one* way to serialize
             // the point at infinity.
             (true, true) => None,
             (false, true) => Some(SWFlags::PointAtInfinity),
-            (true, false) => Some(SWFlags::YIsNegative),
-            (false, false) => Some(SWFlags::YIsPositive),
+            (true, false) => Some(SWFlags::YIsPositive),
+            (false, false) => Some(SWFlags::YIsNegative),
         }
     }
 }
